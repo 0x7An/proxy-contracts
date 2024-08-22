@@ -8,10 +8,14 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 
 contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, AccessControlUpgradeable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    uint256 public constant MAX_SUPPLY = 10000;
+
+    // Mapping to track the maximum supply for each token ID
+    mapping(uint256 => uint256) public maxSupply;
 
     // Mapping to track the total supply of each token ID
     mapping(uint256 => uint256) private _totalSupply;
+
+    mapping(uint256 => bool) private  _redeemed;
 
     // Custom errors
     error MaxSupplyExceeded();
@@ -19,7 +23,7 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
 
     /**
      * @dev Initializer function that replaces the constructor for upgradeable contracts.
-     * This function is called once during the contract deployment to set the initial URI, owner, default admin role.
+     * This function is called once during the contract deployment to set the initial URI, owner, and default admin role.
      * @param uri The URI for all token types by relying on ID substitution.
      */
     function initialize(string memory uri) public virtual initializer {
@@ -30,6 +34,17 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
         // Grant the contract deployer the default admin role and the minter role
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+    }
+
+    /**
+     * @dev Set the maximum supply for a specific token ID.
+     * Only the owner can call this function.
+     * @param id The ID of the token.
+     * @param _maxSupply The maximum supply of the token.
+     */
+    function setMaxSupply(uint256 id, uint256 _maxSupply) public virtual onlyOwner {
+        require(maxSupply[id] == 0, "VoidForge: Max supply already set");
+        maxSupply[id] = _maxSupply;
     }
 
     /**
@@ -47,8 +62,10 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
         bytes memory data
     ) public virtual onlyRole(MINTER_ROLE) {
         uint256 currentSupply = _totalSupply[id];
+        uint256 tokenMaxSupply = maxSupply[id];
+        require(tokenMaxSupply > 0, "VoidForge: Max supply not set");
         unchecked {
-            if (currentSupply + amount > MAX_SUPPLY) {
+            if (currentSupply + amount > tokenMaxSupply) {
                 revert MaxSupplyExceeded();
             }
             _totalSupply[id] = currentSupply + amount;
@@ -78,8 +95,10 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
             amount = amounts[i];
 
             uint256 currentSupply = _totalSupply[id];
+            uint256 tokenMaxSupply = maxSupply[id];
+            require(tokenMaxSupply > 0, "VoidForge: Max supply not set");
             unchecked {
-                if (currentSupply + amount > MAX_SUPPLY) {
+                if (currentSupply + amount > tokenMaxSupply) {
                     revert MaxSupplyExceeded();
                 }
                 _totalSupply[id] = currentSupply + amount;

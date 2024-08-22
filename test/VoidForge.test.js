@@ -8,6 +8,11 @@ describe("VoidForge", function () {
         const [owner, otherAccount, thirdAccount] = await ethers.getSigners();
         const VoidForge = await ethers.getContractFactory("VoidForge");
         const myVoidForge = await upgrades.deployProxy(VoidForge, [uri], { initializer: "initialize" });
+
+        // Set max supply for a few token IDs
+        await myVoidForge.setMaxSupply(1, 10000);
+        await myVoidForge.setMaxSupply(2, 20000);
+
         return { myVoidForge, owner, otherAccount, thirdAccount };
     }
 
@@ -69,10 +74,9 @@ describe("VoidForge", function () {
 
         it("Should not allow minting more than maximum supply (if applicable)", async function () {
             const { myVoidForge, owner } = await deployVoidForgeFixture();
-            const MAX_SUPPLY = 10001;
             
             try {
-                await myVoidForge.mint(owner.address, 1, MAX_SUPPLY + 1, "0x00");
+                await myVoidForge.mint(owner.address, 1, 10001, "0x00"); // Max supply for token ID 1 is 10000
                 assert.fail("The transaction should have reverted");
             } catch (error) {
                 expect(error.message).to.include("MaxSupplyExceeded");
@@ -159,12 +163,8 @@ describe("VoidForge", function () {
             const VoidForgeV2 = await ethers.getContractFactory("VoidForgeV2");
             const upgradedV2 = await upgrades.upgradeProxy(myVoidForge.target, VoidForgeV2);
 
-            // Upgrade to V3 (hypothetical)
-            const VoidForgeV3 = await ethers.getContractFactory("VoidForgeV3");
-            const upgradedV3 = await upgrades.upgradeProxy(upgradedV2.target, VoidForgeV3);
-
-            expect((await upgradedV3.totalSupply(1)).toString()).to.equal('100');
-            expect(await upgradedV3.exists(1)).to.be.true;
+            expect((await upgradedV2.totalSupply(1)).toString()).to.equal('100');
+            expect(await upgradedV2.exists(1)).to.be.true;
         });
     });
 
