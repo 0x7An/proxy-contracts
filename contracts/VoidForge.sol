@@ -22,7 +22,7 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
      * This function is called once during the contract deployment to set the initial URI, owner, default admin role.
      * @param uri The URI for all token types by relying on ID substitution.
      */
-    function initialize(string memory uri) public initializer {
+    function initialize(string memory uri) public virtual initializer {
         __ERC1155_init(uri);
         __Ownable_init(msg.sender);
         __AccessControl_init();
@@ -45,12 +45,15 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
         uint256 id,
         uint256 amount,
         bytes memory data
-    ) public onlyRole(MINTER_ROLE) {
-        if (_totalSupply[id] + amount > MAX_SUPPLY) {
-            revert MaxSupplyExceeded();
+    ) public virtual onlyRole(MINTER_ROLE) {
+        uint256 currentSupply = _totalSupply[id];
+        unchecked {
+            if (currentSupply + amount > MAX_SUPPLY) {
+                revert MaxSupplyExceeded();
+            }
+            _totalSupply[id] = currentSupply + amount;
         }
         _mint(to, id, amount, data);
-        _totalSupply[id] += amount;
     }
 
     /**
@@ -66,12 +69,21 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
         uint256[] memory ids,
         uint256[] memory amounts,
         bytes memory data
-    ) public onlyRole(MINTER_ROLE) {
+    ) public virtual onlyRole(MINTER_ROLE) {
+        uint256 id;
+        uint256 amount;
+
         for (uint256 i = 0; i < ids.length; ++i) {
-            if (_totalSupply[ids[i]] + amounts[i] > MAX_SUPPLY) {
-                revert MaxSupplyExceeded();
+            id = ids[i];
+            amount = amounts[i];
+
+            uint256 currentSupply = _totalSupply[id];
+            unchecked {
+                if (currentSupply + amount > MAX_SUPPLY) {
+                    revert MaxSupplyExceeded();
+                }
+                _totalSupply[id] = currentSupply + amount;
             }
-            _totalSupply[ids[i]] += amounts[i];
         }
         _mintBatch(to, ids, amounts, data);
     }
@@ -81,7 +93,7 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
      * @param id The ID of the token whose total supply is queried.
      * @return The total supply of the token with the specified ID.
      */
-    function totalSupply(uint256 id) public view returns (uint256) {
+    function totalSupply(uint256 id) public view virtual returns (uint256) {
         return _totalSupply[id];
     }
 
@@ -90,7 +102,7 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
      * @param id The ID of the token to check.
      * @return A boolean value indicating whether the token with the specified ID exists.
      */
-    function exists(uint256 id) public view returns (bool) {
+    function exists(uint256 id) public view virtual returns (bool) {
         return _totalSupply[id] > 0;
     }
 
@@ -99,9 +111,7 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
      * Override to allow this contract to return the correct interface support.
      */
     function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        virtual
+        public view virtual
         override(ERC1155Upgradeable, AccessControlUpgradeable)
         returns (bool)
     {
@@ -119,7 +129,7 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
         address from,
         uint256 id,
         uint256 amount
-    ) public {
+    ) public virtual {
         require(
             from == msg.sender || hasRole(MINTER_ROLE, msg.sender),
             "VoidForge: caller is not owner nor approved"
@@ -129,7 +139,9 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
         }
 
         _burn(from, id, amount);
-        _totalSupply[id] -= amount;
+        unchecked {
+            _totalSupply[id] -= amount;
+        }
     }
 
     /**
@@ -143,17 +155,26 @@ contract VoidForge is Initializable, ERC1155Upgradeable, OwnableUpgradeable, Acc
         address from,
         uint256[] memory ids,
         uint256[] memory amounts
-    ) public {
+    ) public virtual {
         require(
             from == msg.sender || hasRole(MINTER_ROLE, msg.sender),
             "VoidForge: caller is not owner nor approved"
         );
 
+        uint256 id;
+        uint256 amount;
+
         for (uint256 i = 0; i < ids.length; ++i) {
-            if (balanceOf(from, ids[i]) < amounts[i]) {
+            id = ids[i];
+            amount = amounts[i];
+
+            if (balanceOf(from, id) < amount) {
                 revert BurnExceedsBalance();
             }
-            _totalSupply[ids[i]] -= amounts[i];
+
+            unchecked {
+                _totalSupply[id] -= amount;
+            }
         }
 
         _burnBatch(from, ids, amounts);
