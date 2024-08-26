@@ -119,7 +119,25 @@ describe("VoidForge", function () {
           }
       });
       
-      
+      it("Should allow ownership transfer", async function () {
+        const { myVoidForge, owner, otherAccount } = await deployVoidForgeFixture();
+    
+        // Transfer ownership to otherAccount
+        await myVoidForge.transferOwnership(otherAccount.address);
+        expect(await myVoidForge.owner()).to.equal(otherAccount.address);
+    
+        // Verify that the new owner can set max supply
+        await myVoidForge.connect(otherAccount).setMaxSupply(3, 5000);
+        expect((await myVoidForge.maxSupply(3)).toString()).to.equal('5000');
+    
+        // Verify that the previous owner no longer has access
+        try {
+            await myVoidForge.setMaxSupply(3, 10000);
+            assert.fail("The transaction should have reverted");
+        } catch (error) {
+            expect(error.message).to.include("Ownable");
+        }
+      });    
     });
 
     describe("Token Transfers", function () {
